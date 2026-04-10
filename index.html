@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Global LogiTrack Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+
+<style>
+body { font-family: Arial; background:#0f2027; color:white; text-align:center; }
+.container { display:flex; justify-content:center; margin-top:30px; }
+.card { background:#203a43; padding:20px; margin:10px; border-radius:10px; width:400px; }
+input, button { width:100%; padding:10px; margin-top:10px; }
+.status { margin-top:15px; background:#2c5364; padding:10px; border-radius:6px; word-break:break-all;}
+</style>
+</head>
+
+<body>
+
+<h2>Global LogiTrack Dashboard</h2>
+
+<button onclick="connectWallet()">Connect Wallet</button>
+<p id="walletStatus"></p>
+
+<div class="container">
+
+<div class="card">
+<h3>Register Product</h3>
+
+<input id="productName" placeholder="Product Name">
+<input id="origin" placeholder="Origin">
+<input type="file" id="certificateFile">
+
+<button onclick="registerProductDirect()">Register</button>
+
+<div id="registerStatus" class="status"></div>
+</div>
+
+<div class="card">
+<h3>Track Product</h3>
+
+<input id="trackingID" placeholder="Tracking ID">
+<button onclick="trackProduct()">Verify</button>
+
+<div id="trackResult" class="status"></div>
+</div>
+
+</div>
+
+<script>
+
+const contractAddress = "0x2c630fe7685806B0F56056993163fF3C3a2E48ea";
+const abi = [
+  {
+    "inputs": [],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "uint256", "name": "trackingID", "type": "uint256" },
+      { "indexed": false, "internalType": "string", "name": "productName", "type": "string" },
+      { "indexed": false, "internalType": "string", "name": "origin", "type": "string" },
+      { "indexed": false, "internalType": "string", "name": "qualityDocCID", "type": "string" },
+      { "indexed": false, "internalType": "address", "name": "registeredBy", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+    ],
+    "name": "ProductRegistered",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "uint256", "name": "trackingID", "type": "uint256" },
+      { "indexed": false, "internalType": "address", "name": "verifier", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+    ],
+    "name": "ProductVerified",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "getCurrentTrackingID",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_trackingID", "type": "uint256" }
+    ],
+    "name": "getProduct",
+    "outputs": [
+      { "internalType": "uint256", "name": "trackingID", "type": "uint256" },
+      { "internalType": "string", "name": "productName", "type": "string" },
+      { "internalType": "string", "name": "origin", "type": "string" },
+      { "internalType": "string", "name": "qualityDocCID", "type": "string" },
+      { "internalType": "uint256", "name": "timestamp", "type": "uint256" },
+      { "internalType": "address", "name": "registeredBy", "type": "address" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_trackingID", "type": "uint256" }
+    ],
+    "name": "productExists",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "string", "name": "_productName", "type": "string" },
+      { "internalType": "string", "name": "_origin", "type": "string" },
+      { "internalType": "string", "name": "_qualityDocCID", "type": "string" }
+    ],
+    "name": "registerProduct",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "_trackingID", "type": "uint256" }
+    ],
+    "name": "verifyProduct",
+    "outputs": [
+      { "internalType": "string", "name": "productName", "type": "string" },
+      { "internalType": "string", "name": "origin", "type": "string" },
+      { "internalType": "string", "name": "qualityDocCID", "type": "string" },
+      { "internalType": "uint256", "name": "timestamp", "type": "uint256" },
+      { "internalType": "address", "name": "registeredBy", "type": "address" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+];
+
+const pinataApiKey = "43d9e7405af00b5fce1b";
+const pinataSecretApiKey = "8bcc2fd0173c78edcd074b3da4503622e41ee795d5ae280454ff0310698e9532";
+
+let web3, contract, account;
+
+// CONNECT WALLET
+async function connectWallet() {
+    if (!window.ethereum) {
+        alert("Install MetaMask");
+        return;
+    }
+
+    web3 = new Web3(window.ethereum);
+
+    await ethereum.request({ method: 'eth_requestAccounts' });
+
+    const accounts = await web3.eth.getAccounts();
+    account = accounts[0];
+
+    contract = new web3.eth.Contract(abi, contractAddress);
+
+    document.getElementById("walletStatus").innerText = "Connected: " + account;
+}
+
+// REGISTER PRODUCT
+async function registerProductDirect() {
+
+    const name = document.getElementById("productName").value;
+    const origin = document.getElementById("origin").value;
+    const file = document.getElementById("certificateFile").files[0];
+
+    const status = document.getElementById("registerStatus");
+
+    if (!name || !origin || !file) {
+        alert("Fill all fields");
+        return;
+    }
+
+    if (!contract) {
+        alert("Connect wallet first");
+        return;
+    }
+
+    try {
+        status.innerHTML = "Uploading to IPFS...";
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const res = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
+            method: "POST",
+            headers: {
+                pinata_api_key: "beec4456726fc6cf8847",
+                pinata_secret_api_key: "128068d4a7de14e69419a1a33ac2f00218ef7931bbf7b96f2bc04662e2b8a93a"
+            },
+            body: formData
+        });
+
+        const data = await res.json();
+
+        if (!data.IpfsHash) {
+            status.innerHTML = "IPFS upload failed";
+            return;
+        }
+
+        const cid = data.IpfsHash;
+
+        status.innerHTML = "CID Generated:<br>" + cid + "<br><br>Waiting for MetaMask...";
+
+        // 🔥 WAIT FOR USER TO CONFIRM
+        const tx = await contract.methods
+            .registerProduct(name, origin, cid)
+            .send({ from: account });
+
+        const txHash = tx.transactionHash;
+
+        // 🔥 SAFE TRACKING ID
+        const trackingID = await contract.methods.getCurrentTrackingID().call();
+
+        status.innerHTML =
+        "<b>SUCCESS ✅</b><br><br>" +
+        "Product: " + name + "<br>" +
+        "Origin: " + origin + "<br><br>" +
+        "CID:<br>" + cid + "<br><br>" +
+        "Tracking ID: " + trackingID + "<br><br>" +
+        "TX:<br>" + txHash + "<br><br>" +
+        "<a href='https://sepolia.etherscan.io/tx/" + txHash + "' target='_blank'>View Transaction</a>";
+
+    } catch (err) {
+        console.error(err);
+        status.innerHTML = "ERROR: " + err.message;
+    }
+}
+
+// VERIFY PRODUCT
+async function trackProduct() {
+
+    const id = document.getElementById("trackingID").value;
+    const result = document.getElementById("trackResult");
+
+    if (!id) {
+        result.innerHTML = "Enter ID";
+        return;
+    }
+
+    try {
+        const p = await contract.methods.getProduct(id).call();
+
+        result.innerHTML =
+        "Product: " + p.productName +
+        "<br>Origin: " + p.origin +
+        "<br>CID:<br>" + p.qualityDocCID +
+        "<br><br><a target='_blank' href='https://ipfs.io/ipfs/" + p.qualityDocCID + "'>View Certificate</a>";
+
+    } catch {
+        result.innerHTML = "Product not found";
+    }
+}
+
+</script>
+
+</body>
+</html>
