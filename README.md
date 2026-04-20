@@ -1,3 +1,14 @@
+<img width="1457" height="1027" alt="image" src="https://github.com/user-attachments/assets/f72c8268-bbd8-4042-8e45-22ef4bd5ec76" />
+
+
+
+
+
+
+
+<img width="1512" height="1061" alt="image" src="https://github.com/user-attachments/assets/b2e4249f-3bb3-4aa3-9a2f-2b97e3ffd578" />
+
+
 # Global LogiTrack - Digital Product Passport System
 
 Global LogiTrack is a full-stack decentralized application for issuing and verifying digital product passports. It combines a premium React dashboard, an Ethereum Sepolia smart contract, secure IPFS certificate storage through Pinata, QR-based verification, and a lightweight Node.js upload gateway to keep Pinata credentials off the frontend.
